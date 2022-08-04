@@ -48,8 +48,13 @@ def get_address_info(address: str):
     vrns = set()
     probably_addresses = {}
     id = 0
+    print(url)
+    print("add info: " + str(addresses_info))
     for address in addresses_info:
-        uik = get_uik_by_add_id(address['id'])
+        try:
+            uik = get_uik_by_add_id(address['id'])
+        except json.decoder.JSONDecodeError:
+            continue
         vrn = uik["vrn"]
         vrns.add(vrn)
         if address["leaf"]:
@@ -65,8 +70,10 @@ def get_address_info(address: str):
 
 def get_uik_by_add_id(id):
     url = f"http://www.cikrf.ru/iservices/voter-services/committee/address/{str(id)}"
+    print("url GET UIK: " + url)
     response = requests.get(url, headers=headers).text
     return json.loads(response)
+
 
 
 def get_uik_info(uik_num):
