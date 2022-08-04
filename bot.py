@@ -1,5 +1,7 @@
 import parser
 import telebot
+import requests
+import json
 from telebot import types
 from addresses import adds
 from keys import TELEGRAM_API_KEY
@@ -15,6 +17,7 @@ change = {'ш.': "ШОССЕ", 'наб.': "НАБ.", 'аллея': "АЛЛЕЯ",
 set_probably_addresses = {}
 my_candidats = []
 quantity_streets_once = 8
+UIK_NUM = None
 
 
 # Алешинская -> Алшкинская
@@ -133,7 +136,7 @@ def delete_message(message_id):
 def greeting(message):
     global CHAT_ID, MESSAGE_ID, PREV_MSG_ID
     CHAT_ID = message.from_user.id
-    msg1 = bot.send_message(message.from_user.id, "🏙 Привет, москвич! В этом году проходит переизбрание муниципальных "
+    bot.send_message(message.from_user.id, "🏙 Привет! В этом году проходит переизбрание муниципальных "
                                            "депутатов в каждом районе Москвы, кроме Щукино.  Бот подскажет, "
                                            "куда и за кого ты можешь пойти и проголосовать."
                                            "\n\n"
@@ -141,9 +144,8 @@ def greeting(message):
                                            "https://www.mos.ru/city/projects/vote2022/#who"
                                            "\n\n"
                                            "🗳 Голосуй, не упусти шанс помочь своему району стать лучше!")
-    msg2 = bot.send_message(message.from_user.id, "Набор доступных команд:", reply_markup=make_markup())
-    MESSAGE_ID = msg2.message_id
-    PREV_MSG_ID = msg1.message_id
+    msg = bot.send_message(message.from_user.id, "Набор доступных команд:", reply_markup=make_markup())
+    MESSAGE_ID = msg.message_id
     bot.send_message(message.from_user.id,
                      "Инициатива создания проекта «Жми галочку» исходит от партии «Новые Люди». Мы рекомендуем вам пойти на выборы и выразить свою гражданскую позицию. Нажмите правильную галочку ✅")
 
@@ -215,7 +217,7 @@ def swipe_streets(callback_query: types.CallbackQuery):
 
 @bot.callback_query_handler(lambda callback_query: callback_query.data.find("uik") == 0)
 def send_address(callback_query: types.CallbackQuery):
-    global CHAT_ID
+    global CHAT_ID, UIK_NUM
     CHAT_ID = callback_query.from_user.id
     try:
         id = callback_query.data[3:]
@@ -230,7 +232,8 @@ def send_address(callback_query: types.CallbackQuery):
             if str(set_probably_addresses[add]['id']) == id:
                 address = add
                 uik = set_probably_addresses[add]["uik"]
-        add_msg = f"🏠 Ваш адрес: {address}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
+        UIK_NUM = uik['name'][uik['name'].rfind("№") + 1:]
+        add_msg = f"🏠 Выбранный дом находится по адресу:\n {address}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
                   f"{uik['address']}"
         msg = bot.send_message(callback_query.from_user.id, add_msg)
         global PREV_MSG_ID
@@ -325,53 +328,54 @@ def inline_street(callback_query: types.CallbackQuery):
 def inline_street(callback_query: types.CallbackQuery):
     global CHAT_ID
     CHAT_ID = callback_query.from_user.id
-    #try:
-    shift = int(callback_query.data[6:])
-    street = adds[address["county"]][address["district"]][shift]
-    address["street"] = street
-    print("STREET:" + street)
-    msg = bot.send_message(callback_query.from_user.id, "Введите номер дома")
-    global MESSAGE_ID
-    delete_message(MESSAGE_ID)
-    MESSAGE_ID = msg.message_id
-    bot.register_next_step_handler(msg, get_street)
-    '''except Exception as e:
+    try:
+        shift = int(callback_query.data[6:])
+        street = adds[address["county"]][address["district"]][shift]
+        address["street"] = street
+        msg = bot.send_message(callback_query.from_user.id, "Введите номер дома")
+        global MESSAGE_ID
+        delete_message(MESSAGE_ID)
+        MESSAGE_ID = msg.message_id
+        bot.register_next_step_handler(msg, get_street)
+    except Exception as e:
         if CHAT_ID != 0:
-            bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")'''
+            bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
 def get_street(message):
-    #try:
-    global MESSAGE_ID
-    delete_message(MESSAGE_ID)
-    delete_message(message.id)
-    load_msg = bot.send_message(message.from_user.id, "Загрузка... 🔁")
-    address["house"] = message.text
-    diff_vrn, info = parser.get_address_info(address_to_url_str())
-    MESSAGE_ID = load_msg.message_id
-    if len(diff_vrn) == 1:
-        uik = {}
-        for i in info.keys():
-            uik = info[i]["uik"]
-        add_msg = f"🏠 Ваш адрес: {address_to_str()}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
-                  f"{uik['address']}\n\n"
+    try:
+        global MESSAGE_ID
         delete_message(MESSAGE_ID)
-        msg = bot.send_message(message.from_user.id, add_msg)
-        global PREV_MSG_ID
-        PREV_MSG_ID = msg.message_id
-        print_candidates(message.from_user.id, uik["vrn"])
-    elif len(diff_vrn) == 0:
-        dont_find(1)
-    else:
-        global set_probably_addresses
-        set_probably_addresses = info
-        delete_message(MESSAGE_ID)
-        msg = bot.send_message(message.from_user.id, "Уточните адрес:", reply_markup=make_choose_add_markup())
-        MESSAGE_ID = msg.message_id
-    '''except Exception as e:
+        delete_message(message.id)
+        load_msg = bot.send_message(message.from_user.id, "Загрузка... 🔁")
+        address["house"] = message.text
+        diff_vrn, info = parser.get_address_info(address_to_url_str())
+        MESSAGE_ID = load_msg.message_id
+        if len(diff_vrn) == 1:
+            uik = {}
+            for i in info.keys():
+                uik = info[i]["uik"]
+            global UIK_NUM
+            UIK_NUM = uik['name'][uik['name'].rfind("№") + 1:]
+            add_msg = f"🏠 Ваш адрес: {address_to_str()}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
+                      f"{uik['address']}\n\n"
+            delete_message(MESSAGE_ID)
+            msg = bot.send_message(message.from_user.id, add_msg)
+            global PREV_MSG_ID
+            PREV_MSG_ID = msg.message_id
+            print_candidates(message.from_user.id, uik["vrn"])
+        elif len(diff_vrn) == 0:
+            dont_find(1)
+        else:
+            global set_probably_addresses
+            set_probably_addresses = info
+            delete_message(MESSAGE_ID)
+            msg = bot.send_message(message.from_user.id, "Уточните адрес:", reply_markup=make_choose_add_markup())
+            MESSAGE_ID = msg.message_id
+    except Exception as e:
         global CHAT_ID
         if CHAT_ID != 0:
-            bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")'''
+            bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
 def get_candidates_info(c, cand_msg, q=0):
@@ -416,24 +420,32 @@ def get_candidates_info(c, cand_msg, q=0):
 
 def print_candidates(message_id, vrn):
     try:
+        global CHAT_ID
         global my_candidats
         global MESSAGE_ID
         load_msg = bot.send_message(message_id, "Загрузка... 🔁")
-        list_candidates = parser.get_list_of_candidates(vrn)
+        list_candidates, mandates = parser.get_list_of_candidates(vrn)
+        global UIK_NUM
+        numokr = None
+        for m in mandates.keys():
+            if str(UIK_NUM) in mandates[m]:
+                numokr = m
+                break
         cand_msg = ""
         q = 0
         for c in list_candidates:
-            if str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1:
+            if str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 and str(c['numokr']) == str(numokr):
                 q, cand_msg = get_candidates_info(c, cand_msg, q)
         for c in list_candidates:
-            if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1:
+            if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1 and str(c['numokr']) == str(numokr):
                 q, cand_msg = get_candidates_info(c, cand_msg, q)
         delete_message(load_msg.message_id)
-        msg = bot.send_message(message_id, "Ваши кандидаты:\n" + my_candidats[0],
+        msg = bot.send_message(message_id, f"Список кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
                                reply_markup=make_markup_swipe_candidates(0))
         MESSAGE_ID = msg.message_id
+    except IndexError:
+        bot.send_message(CHAT_ID, "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино, Новой Москвы и Троицка.")
     except Exception as e:
-        global CHAT_ID
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -476,7 +488,7 @@ def dont_find(is_add=0):
     global MESSAGE_ID, PREV_MSG_ID
     msg_text = ""
     if is_add:
-        msg_text = f"🏠 Ваш адрес: {address_to_str()}?\nК сожалению, не можем найти УИК по выбранному адресу.\n\n"
+        msg_text = f"🏠 Ваш адрес: {address_to_str()}?\n\nК сожалению, не можем найти УИК по выбранному адресу.\n\n"
     msg_text += f"🙋Если вы не можете найти адрес дома, напишите нам: @vfv_support_bot\n\n"
     msg_text += f"🏫Вы также можете сделать это самостоятельно, перейдя на официальный сайт Избиркома: \n" \
           "http://www.cikrf.ru/digital-services/naydi-svoy-izbiratelnyy-uchastok"

@@ -48,8 +48,6 @@ def get_address_info(address: str):
     vrns = set()
     probably_addresses = {}
     id = 0
-    print(url)
-    print("add info: " + str(addresses_info))
     for address in addresses_info:
         try:
             uik = get_uik_by_add_id(address['id'])
@@ -70,10 +68,8 @@ def get_address_info(address: str):
 
 def get_uik_by_add_id(id):
     url = f"http://www.cikrf.ru/iservices/voter-services/committee/address/{str(id)}"
-    print("url GET UIK: " + url)
     response = requests.get(url, headers=headers).text
     return json.loads(response)
-
 
 
 def get_uik_info(uik_num):
@@ -85,6 +81,8 @@ def get_list_of_candidates(UIK_VRN):
     list_of_candidates = []
     CAMPAIGN_VRN = json.loads(requests.get("http://cikrf.ru/iservices/voter-services/vibory/committee/" + str(UIK_VRN),
                                            headers=headers).text)[0]["vrn"]
+    mandates = get_nums_districts(CAMPAIGN_VRN)
+
     # requests.get("http://cikrf.ru/iservices/sgo-visual-rest/vibory/{CAMPAIGN_VRN}/tvd", headers=headers)
     PAGE_NUM = 0
     total_pages = 1
@@ -96,11 +94,58 @@ def get_list_of_candidates(UIK_VRN):
         total_pages = candidates_json["page"]["totalPages"]
         for candidate in candidates_json["_embedded"]["candidateDtoList"]:
             list_of_candidates.append(candidate)
-    return list_of_candidates
+    return list_of_candidates, mandates
 
 
 def find_uik(id):
     url = f"http://www.cikrf.ru/iservices/voter-services/committee/address/{str(id)}"
+
+
+def get_mandates(url):
+    response = requests.get(url, headers=headers)
+    code = response.text
+    code = code[code.find("tvdTreeJson = {"):]
+    code = code[:code.find("\n")]
+    code = code[len("tvdTreeJson = "):]
+    mandates_info = json.loads(code)
+    return mandates_info["children"]
+
+
+def get_nums_districts(campaign_vrn):
+    url = f"http://www.vybory.izbirkom.ru/region/izbirkom?action=show&root=1&vrn={campaign_vrn}&prver=0&pronetvd=null&region=77&sub_region=77"
+    mandates = get_mandates(url)
+    uiks = {}
+    if mandates == []:
+        #TODO
+        response = requests.get(url, headers=headers)
+        code = response.text
+        code = code[code.find("tvdTreeJson = {"):]
+        code = code[:code.find("\n")]
+        code = code[len("tvdTreeJson = "):]
+        mandates_info = json.loads(code)
+        print(mandates_info)
+    else:
+        for m in mandates:
+            m_name = m["text"]
+            m_num = m_name[m_name.rfind(" ") + 1:]
+            if m_num.find("№") != -1:
+               m_num = m_num[m_num.find("№") + 1:]
+            uiks[m_num] = get_list_uiks(m["href"])
+    return uiks
+
+
+def get_list_uiks(url_suffix):
+    url = "http://www.vybory.izbirkom.ru/" + url_suffix
+    mandates = get_mandates(url)
+    list_num_uiks = []
+    for m in mandates:
+        if m["href"] == url_suffix:
+            uiks = m["children"]
+            break
+    for u in uiks:
+        uik_name = u["text"]
+        list_num_uiks.append(uik_name[uik_name.rfind(" ") + 2:])
+    return list_num_uiks
 
 
 if __name__ == "__main__":
@@ -111,8 +156,8 @@ if __name__ == "__main__":
 
     #print(get_address_info("Город Москва Восточный административный округ район Ивановское КУПАВЕНСКИЙ Б. ПР. 2"))
 
-    print(get_list_of_candidates(4774012116710))
-
+    #print(get_list_of_candidates(4774012116710))
+    print(get_nums_districts(4774004309365))
     # TODO: сделать словарь {vrn:[num, list_of_candidates]}
     # TODO: пройти по всем uik(4000 + проверка) и выкачать все данные
 
