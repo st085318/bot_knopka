@@ -261,9 +261,9 @@ def send_address(callback_query: types.CallbackQuery):
 @bot.callback_query_handler(lambda callback_query: callback_query.data.find("find_cik") == 0)
 def inline_county(callback_query: types.CallbackQuery):
     CHAT_ID = callback_query.from_user.id
-    MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
-    PREV_MSG_ID = get_user_info(CHAT_ID)["PREV_MSG_ID"]
     try:
+        MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
+        PREV_MSG_ID = get_user_info(CHAT_ID)["PREV_MSG_ID"]
         try:
             delete_message(CHAT_ID, MESSAGE_ID)
             delete_message(CHAT_ID, PREV_MSG_ID)
