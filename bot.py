@@ -345,8 +345,6 @@ def inline_house(callback_query: types.CallbackQuery):
     try:
         shift = int(callback_query.data[6:int(str(callback_query.data).find(":"))])
         page_num = int(callback_query.data[int(str(callback_query.data).find(":")) + 1:])
-        print(shift)
-        print(page_num)
         street = adds[address["county"]][address["district"]][shift + page_num]
         address["street"] = street
         set_user_info(CHAT_ID, "address", address)
@@ -428,7 +426,6 @@ def get_candidates_info(c, cand_msg, q, CHAT_ID):
         if q % 7 == 0:
             my_candidats = list(get_user_info(CHAT_ID)["my_candidats"])
             my_candidats.append(cand_msg)
-            print("STEP " + str(my_candidats))
             set_user_info(CHAT_ID, "my_candidats", my_candidats)
             cand_msg = ""
         return q, cand_msg
@@ -449,7 +446,6 @@ def print_candidates(message_id, vrn, CHAT_ID):
             if str(UIK_NUM) in mandates[m]:
                 numokr = m
                 break
-        print(numokr)
         cand_msg = ""
         q = 0
         for c in list_candidates:
@@ -460,7 +456,6 @@ def print_candidates(message_id, vrn, CHAT_ID):
                 q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
         my_candidats = get_user_info(CHAT_ID)["my_candidats"]
         delete_message(CHAT_ID, load_msg.message_id)
-        print(my_candidats)
         msg = bot.send_message(message_id, f"Список кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
                                reply_markup=make_markup_swipe_candidates(0))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
