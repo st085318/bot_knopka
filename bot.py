@@ -45,7 +45,7 @@ def address_to_url_str(CHAT_ID):
                 street = street[:street.find(suffix) - 2] + " " + change[suffix]
 
         return add + street.replace('ё', 'е').upper() + " " + address["house"]
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -60,7 +60,7 @@ def address_to_str(CHAT_ID):
                 add += address[k] + ", "
         add = add[:-2]
         return add
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -118,7 +118,7 @@ def make_street_markup(CHAT_ID, county, district, num_street_page=0):
                    types.InlineKeyboardButton("Закрыть", callback_data=f"close"),
                    types.InlineKeyboardButton("Вперед>>", callback_data=f"1swipeS{num_street_page}"))
         return markup
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return None
@@ -133,7 +133,7 @@ def make_choose_add_markup(CHAT_ID):
             markup.add(types.InlineKeyboardButton(add_info, callback_data=callback))
         markup.add(types.InlineKeyboardButton("Моего дома нет", callback_data="dont_find_street"))
         return markup
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return None
@@ -203,7 +203,7 @@ def swipe_candidates(callback_query: types.CallbackQuery):
                                reply_markup=make_markup_swipe_candidates(
                                    (page + direction + len(my_candidats)) % (len(my_candidats))))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -237,7 +237,7 @@ def swipe_streets(callback_query: types.CallbackQuery):
         msg = bot.send_message(callback_query.from_user.id, "Выберите улицу:",
                                reply_markup=make_street_markup(CHAT_ID, county, district, new_page))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -266,7 +266,7 @@ def send_address(callback_query: types.CallbackQuery):
         global PREV_MSG_ID
         set_user_info(CHAT_ID, "PREV_MSG_ID", str(msg.message_id))
         print_candidates(callback_query.from_user.id, uik["vrn"], CHAT_ID)
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -286,7 +286,7 @@ def inline_county(callback_query: types.CallbackQuery):
         bot.answer_callback_query(callback_query.id)
         msg = bot.send_message(callback_query.from_user.id, "Выберите округ:", reply_markup=make_county_markup())
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -325,7 +325,7 @@ def inline_district(callback_query: types.CallbackQuery):
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -347,7 +347,7 @@ def inline_street(callback_query: types.CallbackQuery):
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -367,7 +367,7 @@ def inline_house(callback_query: types.CallbackQuery):
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
         bot.register_next_step_handler(msg, get_street)
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -404,7 +404,7 @@ def get_street(message):
             delete_message(CHAT_ID, MESSAGE_ID)
             msg = bot.send_message(message.from_user.id, "Уточните адрес:", reply_markup=make_choose_add_markup(CHAT_ID))
             set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -443,7 +443,7 @@ def get_candidates_info(c, cand_msg, q, CHAT_ID):
             set_user_info(CHAT_ID, "my_candidats", my_candidats)
             cand_msg = ""
         return q, cand_msg
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return 0, ""
@@ -475,7 +475,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
     except IndexError:
         bot.send_message(CHAT_ID, "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).")
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -484,7 +484,7 @@ def menu(CHAT_ID):
     try:
         msg = bot.send_message(CHAT_ID, "Набор доступных команд:", reply_markup=make_markup())
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -494,7 +494,7 @@ def send_welcome(message):
     try:
         CHAT_ID = message.from_user.id
         greeting(message)
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -506,7 +506,7 @@ def send_welcome(message):
         bot.send_message(CHAT_ID, "💬 Блок «Помощь»\n"
                                   "Бот не отвечает? – Нажмите /start, чтобы его перезапустить.\n"
                                   "Бот не находит ваш УИК?* – Напишите нам в чат обратной связи: @vfv_support_bot")
-    except OverflowError as e:
+    except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
