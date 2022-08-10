@@ -38,7 +38,7 @@ def set_user_info(chat_id, var, val):
 def address_to_url_str(CHAT_ID):
     try:
         address = get_user_info(CHAT_ID)["address"]
-        add = f"Город Москва {address['county']} {address['district']} "
+        add = f"Город Москва {address['county']} {address['district'].replace('ё', 'е')} "
         street = address['street']
         for suffix in change.keys():
             if street.find(suffix) != -1:
@@ -366,13 +366,13 @@ def inline_house(callback_query: types.CallbackQuery):
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-        bot.register_next_step_handler(msg, get_street)
+        bot.register_next_step_handler(msg, get_house)
     except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
-def get_street(message):
+def get_house(message):
     try:
         CHAT_ID = message.from_user.id
         user_info = get_user_info(CHAT_ID)
