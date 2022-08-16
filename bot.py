@@ -4,13 +4,19 @@ import os
 import json
 from telebot import types
 from addresses import adds
+#from new_addresses_extra import adds
 from keys import TELEGRAM_API_KEY
 
 bot = telebot.TeleBot(TELEGRAM_API_KEY)
 NEW_PEOPLE_URL = "https://newpeople.ru/"
-change = {'ш.': "ШОССЕ", 'наб.': "НАБ.", 'аллея': "АЛЛЕЯ", 'ул.': "УЛ.", 'кв-л': "КВАРТАЛ", 'туп.': "ТУП.",
-          'б-р': "БУЛЬВ.", 'пр-т': "ПРОСП.", 'мкр.': "", 'линия': "ЛИНИЯ", 'пр-д': "ПР.", 'пер.': "ПЕР."}
+change = {'ш.': "ШОССЕ", 'наб.': "НАБ.", 'аллея': "АЛЛЕЯ", 'ул.': "УЛ.", 'кв-л': "КВАРТАЛ", 'туп.': "ТУП.", 'б-р': "БУЛЬВ.", 'пр-т': "ПРОСП.", 'мкр.': "", 'линия': "ЛИНИЯ", 'пр-д': "ПР.", 'пер.': "ПЕР.", 'шоссе': "ШОССЕ", 'набережная': "НАБ.",
+          'улица': "УЛ.", 'квартал': "КВАРТАЛ", 'тупик': "ТУП.", 'бульвар': "БУЛЬВ.", 'проспект': "ПРОСП.", 'микрорайон': "",
+          'проезд': "ПР.", 'переулок': "ПЕР", "городок": "городок", 'площадь': 'площадь', 'км.': 'км.' , 'просек': 'просек'}
 quantity_streets_once = 8
+
+
+adj = {"Старый": "Ст", "Новый": "Нов", "Средний": "СР", "Большой": "Б", "Малый": "М",
+       "Старая": "Ст", "Новая": "Нов", "Средняя": "СР", "Большая": "Б", "Малая": "М"}
 
 
 def create_file(chat_id):
@@ -35,17 +41,36 @@ def set_user_info(chat_id, var, val):
 
 # Алешинская -> Алшкинская
 # TODO: удалять ё
-def address_to_url_str(CHAT_ID):
+def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, house=None):
+    def format_street(street, suffix):
+        words_street = street.split(" ")
+        if ((words_street[0] == "Старый" or words_street[0] == "Старая") and street != "Старый гай") or street == "Новый Зыковский проезд" or words_street[0] == "Новая":
+            street = street[street.find(" ") + 1:street.find(suffix) - 2] + " " + adj[words_street[0]] + change[suffix]
+        elif words_street[0] in ["Большой", "Малый", "Средний", "Большая", "Малая", "Средняя"]:
+            street = street[street.find(" ") + 1:street.find(suffix) - 2] + " " + adj[words_street[0]] + " " + change[suffix]
+        else:
+            street = street[:street.find(suffix) - 2] + " " + change[suffix]
+        return street
+
     try:
-        address = get_user_info(CHAT_ID)["address"]
-        add = f"Город Москва {address['county']} {address['district'].replace('ё', 'е')} "
-        street = address['street']
+        if county is None:
+            address = get_user_info(CHAT_ID)["address"]
+            county = address['county']
+            district = address['district']
+            street = address['street']
+            house = address["house"]
+        if county == "Зеленоградский административный округ":
+            district+=" Зеленоград г"
+        add = f"Город Москва {county} {district.replace('ё', 'е')} "
+        if street.find("микрорайон") != -1:
+            return add + "д " + house
         for suffix in change.keys():
             if street.find(suffix) != -1:
-                street = street[:street.find(suffix) - 2] + " " + change[suffix]
-
-        return add + street.replace('ё', 'е').upper() + " " + address["house"]
-    except BaseException as e:
+                street = format_street(street, suffix)
+        if house is None:
+            return add + street.replace('ё', 'е').upper()
+        return add + street.replace('ё', 'е').upper() + " " + house
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -60,10 +85,16 @@ def address_to_str(CHAT_ID):
                 add += address[k] + ", "
         add = add[:-2]
         return add
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
+
+
+def make_markup_insert_street():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Ввести улицу самостоятельно", callback_data="write_street"))
+    return markup
 
 
 def make_markup_swipe_candidates(page):
@@ -118,7 +149,7 @@ def make_street_markup(CHAT_ID, county, district, num_street_page=0):
                    types.InlineKeyboardButton("Закрыть", callback_data=f"close"),
                    types.InlineKeyboardButton("Вперед>>", callback_data=f"1swipeS{num_street_page}"))
         return markup
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return None
@@ -133,7 +164,7 @@ def make_choose_add_markup(CHAT_ID):
             markup.add(types.InlineKeyboardButton(add_info, callback_data=callback))
         markup.add(types.InlineKeyboardButton("Моего дома нет", callback_data="dont_find_street"))
         return markup
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return None
@@ -141,7 +172,7 @@ def make_choose_add_markup(CHAT_ID):
 
 def to_short_county(county: str):
     if county == "Зеленоградский административный округ":
-        return "Зеленоград"
+        return "ЗелАО"
     split_county = county.split(" ")
     split_county[0] = split_county[0].split("-")
     short_county = ""
@@ -163,15 +194,19 @@ def delete_message(CHAT_ID, message_id):
 def greeting(message):
     CHAT_ID = message.from_user.id
     href = "https://www.mos.ru/city/projects/vote2022/#who"
-    bot.send_message(message.from_user.id, "Привет! В этом году состоятся выборы муниципальных депутатов в районах Москвы.\n"
-                                           "Наш бот поможет найти адрес вашего избирательного участка, и посмотреть список кандидатов, которые идут на выборы в вашем районе.\n\n"
-                                           "🗳 Приходи на выборы или голосуй онлайн в личном кабинете на сайте mos.ru.\n\n"
-                                           "Если сомневаешься, вот три причины для того, чтобы обязательно прийти на выборы:\n\n"
-                                           "1. Муниципальная власть – самая близкая людям. Каждый из нас может лично познакомиться с депутатом, который живёт по соседству и не понаслышке знает о проблемах нашего района\n\n"
-                                           "2. Чтобы Совет депутатов работал в интересах жителей, необходимо регулярно обновлять депутатский корпус. Голосование на выборах – единственный шанс сделать это\n\n"
-                                           "3. Если вы не придёте на избирательный участок, выбор за вас сделают другие. Ваш голос не будет услышан, ваше мнение — проигнорируют, а об удобстве и комфорте москвичей будут вспоминать лишь от случая к случаю.\n\n\n"
-                                           f"Подробнее о предстоящих выборах читай на сайте: {href}\n\n"
-                                           "Инициатива информирования о выборах  «Жми галочку»  создана при поддержке партии «Новые Люди».", disable_web_page_preview=True)
+    photo = open("media/greeting.png", 'rb')
+    bot.send_message(message.from_user.id,
+                     "Привет! В этом году состоятся выборы муниципальных депутатов в районах Москвы.\n"
+                     "Наш бот поможет найти адрес вашего избирательного участка, и посмотреть список кандидатов, которые идут на выборы в вашем районе.\n\n"
+                     "🗳 Приходи на выборы или голосуй онлайн в личном кабинете на сайте mos.ru.\n\n"
+                     "Если сомневаешься, вот три причины для того, чтобы обязательно прийти на выборы:\n\n"
+                     "1. Муниципальная власть – самая близкая людям. Каждый из нас может лично познакомиться с депутатом, который живёт по соседству и не понаслышке знает о проблемах нашего района\n\n"
+                     "2. Чтобы Совет депутатов работал в интересах жителей, необходимо регулярно обновлять депутатский корпус. Голосование на выборах – единственный шанс сделать это\n\n"
+                     "3. Если вы не придёте на избирательный участок, выбор за вас сделают другие. Ваш голос не будет услышан, ваше мнение — проигнорируют, а об удобстве и комфорте москвичей будут вспоминать лишь от случая к случаю.\n\n\n"
+                     f"Подробнее о предстоящих выборах читай на сайте: {href}\n\n"
+                     "Инициатива информирования о выборах  «Жми галочку»  создана при поддержке партии «Новые Люди».",
+                     disable_web_page_preview=True)
+    bot.send_photo(message.from_user.id, photo)
     msg = bot.send_message(message.from_user.id, "Набор доступных команд:", reply_markup=make_markup())
     set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
 
@@ -186,6 +221,34 @@ def send_welcome(message):
 def dont_find_something(callback_query: types.CallbackQuery):
     CHAT_ID = callback_query.from_user.id
     dont_find(CHAT_ID)
+
+
+@bot.callback_query_handler(lambda callback_query: callback_query.data.find("write_street") != -1)
+def dont_find_something(callback_query: types.CallbackQuery):
+    CHAT_ID = callback_query.from_user.id
+    about_format = "Введите улицу, на которой проживаете в формате: <название улицы, вид улицы>\nНапример - Союзный, проспект"
+    msg = bot.send_message(CHAT_ID, about_format)
+    MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
+    delete_message(CHAT_ID, MESSAGE_ID)
+    set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
+    bot.register_next_step_handler(msg, write_street)
+
+
+def write_street(message):
+    try:
+        CHAT_ID = message.from_user.id
+        address = get_user_info(CHAT_ID)["address"]
+        address["street"] = message.text
+        set_user_info(CHAT_ID, "address", address)
+        msg = bot.send_message(CHAT_ID, "Введите номер дома")
+        MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
+        delete_message(CHAT_ID, MESSAGE_ID)
+        set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
+        bot.register_next_step_handler(msg, get_house)
+    except ZeroDivisionError as e:
+        if CHAT_ID != 0:
+            bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
+
 
 
 @bot.callback_query_handler(lambda callback_query: callback_query.data.find("swipeC") != -1)
@@ -203,7 +266,7 @@ def swipe_candidates(callback_query: types.CallbackQuery):
                                reply_markup=make_markup_swipe_candidates(
                                    (page + direction + len(my_candidats)) % (len(my_candidats))))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -237,7 +300,7 @@ def swipe_streets(callback_query: types.CallbackQuery):
         msg = bot.send_message(callback_query.from_user.id, "Выберите улицу:",
                                reply_markup=make_street_markup(CHAT_ID, county, district, new_page))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -266,7 +329,7 @@ def send_address(callback_query: types.CallbackQuery):
         global PREV_MSG_ID
         set_user_info(CHAT_ID, "PREV_MSG_ID", str(msg.message_id))
         print_candidates(callback_query.from_user.id, uik["vrn"], CHAT_ID)
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -286,7 +349,7 @@ def inline_county(callback_query: types.CallbackQuery):
         bot.answer_callback_query(callback_query.id)
         msg = bot.send_message(callback_query.from_user.id, "Выберите округ:", reply_markup=make_county_markup())
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return ""
@@ -325,7 +388,7 @@ def inline_district(callback_query: types.CallbackQuery):
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -347,7 +410,7 @@ def inline_street(callback_query: types.CallbackQuery):
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -367,12 +430,57 @@ def inline_house(callback_query: types.CallbackQuery):
         delete_message(CHAT_ID, MESSAGE_ID)
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
         bot.register_next_step_handler(msg, get_house)
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
 def get_house(message):
+    def format_house(house_num):
+        house_num = house_num.replace(" ", "")
+        housing = ["корпус", "кор.", "кор", "к.", "к"]
+        building = ["строение", "стр.", "стр", "с.", "с"]
+        housing_num = None
+        building_num = None
+        # TODO REFORMAT
+        for h_specie in housing:
+            if house_num.find(h_specie) != -1:
+                housing_num = "К" + " "
+                h_pointer = house_num.find(h_specie) + len(h_specie)
+                h_start = h_pointer
+                while is_digit(house_num[h_pointer]):
+                    housing_num += house_num[h_pointer]
+                    h_pointer += 1
+                    if h_pointer >= len(house_num):
+                        break
+                house_num = house_num[:h_start] + house_num[min(h_pointer, len(house_num) - 1):]
+                break
+        for b_specie in building:
+            if house_num.find(b_specie) != -1:
+                building_num = "стр" + " "
+                b_pointer = house_num.find(b_specie) + len(b_specie)
+                while is_digit(house_num[b_pointer]):
+                    building_num += house_num[b_pointer]
+                    b_pointer += 1
+                    if b_pointer >= len(house_num):
+                        break
+                break
+        p = 0
+        while not is_digit(house_num[p]):
+            p += 1
+        house_num = house_num[p:]
+        p = 0
+        while is_digit(house_num[p]):
+            p += 1
+            if p == len(house_num):
+                break
+        house_num = house_num[:p]
+        if not (housing_num is None):
+            house_num += " " + housing_num
+        if not (building_num is None):
+            house_num += " " + building_num
+        return house_num
+
     try:
         CHAT_ID = message.from_user.id
         user_info = get_user_info(CHAT_ID)
@@ -381,7 +489,8 @@ def get_house(message):
         delete_message(CHAT_ID, message.id)
         load_msg = bot.send_message(message.from_user.id, "Загрузка... 🔁")
         address = user_info["address"]
-        address["house"] = message.text
+        address["house"] = format_house(message.text)
+
         set_user_info(CHAT_ID, "address", address)
         diff_vrn, info = parser.get_address_info(address_to_url_str(CHAT_ID))
         MESSAGE_ID = load_msg.message_id
@@ -404,7 +513,7 @@ def get_house(message):
             delete_message(CHAT_ID, MESSAGE_ID)
             msg = bot.send_message(message.from_user.id, "Уточните адрес:", reply_markup=make_choose_add_markup(CHAT_ID))
             set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -443,16 +552,22 @@ def get_candidates_info(c, cand_msg, q, CHAT_ID):
             set_user_info(CHAT_ID, "my_candidats", my_candidats)
             cand_msg = ""
         return q, cand_msg
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
         return 0, ""
 
 
 def print_candidates(message_id, vrn, CHAT_ID):
+    def special_people(candidate):
+        time_point = str(candidate["datroj"]).rfind(" ")
+        if str(candidate["fio"]) == "Ляховецкий Никита Владимирович" and str(candidate["datroj"])[:time_point] == "07.08.1998":
+            return 1
+        return 0
     try:
         user_info = get_user_info(CHAT_ID)
         load_msg = bot.send_message(message_id, "Загрузка... 🔁")
+        set_user_info(CHAT_ID, "my_candidats",  [])
         list_candidates, mandates = parser.get_list_of_candidates(vrn)
         UIK_NUM = user_info["UIK_NUM"]
         numokr = None
@@ -463,7 +578,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
         cand_msg = ""
         q = 0
         for c in list_candidates:
-            if str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 and str(c['numokr']) == str(numokr):
+            if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 and str(c['numokr']) == str(numokr)) or special_people(c):
                 q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
         for c in list_candidates:
             if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1 and str(c['numokr']) == str(numokr):
@@ -475,7 +590,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
     except IndexError:
         bot.send_message(CHAT_ID, "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).")
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -484,7 +599,7 @@ def menu(CHAT_ID):
     try:
         msg = bot.send_message(CHAT_ID, "Набор доступных команд:", reply_markup=make_markup())
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -494,7 +609,7 @@ def send_welcome(message):
     try:
         CHAT_ID = message.from_user.id
         greeting(message)
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -506,7 +621,7 @@ def send_welcome(message):
         bot.send_message(CHAT_ID, "💬 Блок «Помощь»\n"
                                   "Бот не отвечает? – Нажмите /start, чтобы его перезапустить.\n"
                                   "Бот не находит ваш УИК?* – Напишите нам в чат обратной связи: @vfv_support_bot")
-    except BaseException as e:
+    except ZeroDivisionError as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
@@ -520,9 +635,13 @@ def dont_find(CHAT_ID, is_add=0):
     msg_text += f"🏫 Вы также можете сделать это самостоятельно, перейдя на официальный сайт Избиркома: \n" \
           "http://www.cikrf.ru/digital-services/naydi-svoy-izbiratelnyy-uchastok"
     delete_message(CHAT_ID, MESSAGE_ID)
-    msg = bot.send_message(CHAT_ID, msg_text)
+    msg = bot.send_message(CHAT_ID, msg_text, reply_markup=make_markup_insert_street())
     set_user_info(CHAT_ID, "PREV_MSG_ID", msg.message_id)
     menu(CHAT_ID)
+
+
+def is_digit(char):
+    return 9 >= ord(char) - ord("0") >= 0
 
 
 if __name__ == "__main__":

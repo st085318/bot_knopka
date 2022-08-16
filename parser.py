@@ -41,9 +41,10 @@ def is_vrn_in_vrns(vrn, vrns):
     return 0
 
 
-def get_address_info(address: str):
+def get_address_info(address: str, quantity_return = 2):
     format_address = f"%20".join(address.split(" "))
     url = f"http://www.cikrf.ru/iservices/voter-services/address/search/{format_address}"
+    print(url)
     addresses_info = json.loads(requests.get(url, headers=headers).text)
     vrns = set()
     probably_addresses = {}
@@ -55,6 +56,8 @@ def get_address_info(address: str):
             continue
         vrn = uik["vrn"]
         vrns.add(vrn)
+        if quantity_return == 1:
+            return vrns
         if address["leaf"]:
             suff = address['name'].rfind(',')
             pref = address['name'][:suff]
@@ -63,6 +66,8 @@ def get_address_info(address: str):
             pref = pref[pref.find(', ') + 2:]
             probably_addresses[pref[:suff]] = {'id': id, 'uik': {'name': uik['name'], 'address': uik["votingAddress"]["address"], "vrn": uik["vrn"]}}
             id += 1
+    if quantity_return == 1:
+        return vrns
     return vrns, probably_addresses
 
 
@@ -146,6 +151,12 @@ def get_list_uiks(url_suffix):
         uik_name = u["text"]
         list_num_uiks.append(uik_name[uik_name.rfind(" ") + 2:])
     return list_num_uiks
+
+
+def is_add_exist(address):
+    vrns = get_address_info(address, 1)
+    print(vrns)
+    return len(vrns) > 0
 
 
 if __name__ == "__main__":
