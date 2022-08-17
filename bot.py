@@ -578,7 +578,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
         cand_msg = ""
         q = 0
         for c in list_candidates:
-            if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 and str(c['numokr']) == str(numokr)) or special_people(c):
+            if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 or special_people(c)) and str(c['numokr']) == str(numokr):
                 q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
         for c in list_candidates:
             if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1 and str(c['numokr']) == str(numokr):
