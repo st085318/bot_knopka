@@ -138,7 +138,6 @@ def make_street_markup(CHAT_ID, county, district, num_street_page=0):
         markup = types.InlineKeyboardMarkup()
         shift = 0
         global quantity_streets_once
-        print(adds[county][district])
         for c in adds[county][district][num_street_page:num_street_page + quantity_streets_once]:
             # TODO:rewrite on num
             callback = "street" + str(shift) + ":" + str(num_street_page)
@@ -580,10 +579,25 @@ def print_candidates(message_id, vrn, CHAT_ID):
         q = 0
         for c in list_candidates:
             if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 or special_people(c)) and str(c['numokr']) == str(numokr):
-                q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
+                try:
+                    if str(c['registr']) == "зарегистрирован":
+                        q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
+                except KeyError:
+                    pass
         for c in list_candidates:
-            if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1 and str(c['numokr']) == str(numokr):
-                q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
+            if str(c['namio']).find("Самовыдвижение") != -1 and str(c['numokr']) == str(numokr):
+                try:
+                    if str(c['registr']) == "зарегистрирован":
+                        q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
+                except KeyError:
+                    pass
+        for c in list_candidates:
+            if str(c['namio']).find("НОВЫЕ ЛЮДИ") == -1 and str(c['namio']).find("Самовыдвижение") == -1 and (not special_people(c)) and str(c['numokr']) == str(numokr):
+                try:
+                    if str(c['registr']) == "зарегистрирован":
+                        q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
+                except KeyError:
+                    pass
         my_candidats = get_user_info(CHAT_ID)["my_candidats"]
         delete_message(CHAT_ID, load_msg.message_id)
         msg = bot.send_message(message_id, f"Список кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
@@ -651,4 +665,7 @@ if __name__ == "__main__":
         pass
     else:
         os.mkdir(path)
-    bot.infinity_polling()
+    try:
+        bot.infinity_polling()
+    except BaseException:
+        pass

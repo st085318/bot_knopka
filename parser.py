@@ -44,7 +44,6 @@ def is_vrn_in_vrns(vrn, vrns):
 def get_address_info(address: str, quantity_return = 2):
     format_address = f"%20".join(address.split(" "))
     url = f"http://www.cikrf.ru/iservices/voter-services/address/search/{format_address}"
-    print(url)
     addresses_info = json.loads(requests.get(url, headers=headers).text)
     vrns = set()
     probably_addresses = {}
@@ -84,7 +83,7 @@ def get_uik_info(uik_num):
 
 def get_list_of_candidates(UIK_VRN):
     list_of_candidates = []
-    CAMPAIGN_VRN = json.loads(requests.get("http://cikrf.ru/iservices/voter-services/vibory/committee/" + str(UIK_VRN),
+    CAMPAIGN_VRN = json.loads(requests.get(f"http://cikrf.ru/iservices/voter-services/vibory/committee/{str(UIK_VRN)}",
                                            headers=headers).text)[0]["vrn"]
     mandates = get_nums_districts(CAMPAIGN_VRN)
 
@@ -128,7 +127,6 @@ def get_nums_districts(campaign_vrn):
         code = code[:code.find("\n")]
         code = code[len("tvdTreeJson = "):]
         mandates_info = json.loads(code)
-        print(mandates_info)
     else:
         for m in mandates:
             m_name = m["text"]
@@ -155,7 +153,6 @@ def get_list_uiks(url_suffix):
 
 def is_add_exist(address):
     vrns = get_address_info(address, 1)
-    print(vrns)
     return len(vrns) > 0
 
 
@@ -175,7 +172,3 @@ if __name__ == "__main__":
     # get_list_areas("http://ginfo.ru/ulicy/" + '?okrug=4', "", 1)
     # with open("addresses.json", "w") as f:
     #    f.write(str(get_list_streets("http://ginfo.ru/ulicy/")))
-
-
-
-
