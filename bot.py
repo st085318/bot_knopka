@@ -65,7 +65,15 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
         if county == "Зеленоградский административный округ":
             district += " Зеленоград г"
         if district.find("-") != -1:
-            district = district[:district.find("-")] + " " + district[district.find("-") + 1:]
+            b = district[:district.find("-")]
+            e = district[district.find("-") + 1:]
+            print(b)
+            district = b
+            if district.upper().find("ОРЕХОВО") == -1:
+                district += " "
+            district += e
+            print(district)
+            print("---------------------------------------")
         add = f"Город Москва {county} {district.replace('ё', 'е')} "
         if street.find("микрорайон") != -1:
             return add + "д " + str(house)
@@ -74,6 +82,10 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
                 street = format_street(street, suffix)
         if street.upper().find("РАЙОН") != -1:
             street = "д"
+        print(street)
+        if street.upper().find("СЕВЕРНАЯ") != -1:
+            part_street = street.split(" ")
+            street = part_street[1][:-1] + " " + part_street[0] + " " + part_street[2]
         if house is None:
             return add + street.replace('ё', 'е').upper()
         return add + street.replace('ё', 'е').upper() + " " + house
@@ -135,7 +147,7 @@ def make_county_markup():
 def make_district_markup(county):
     markup = types.InlineKeyboardMarkup()
     for district in adds[county].keys():
-        markup.add(types.InlineKeyboardButton(str(district), callback_data="district" + str(district)[:15]))
+        markup.add(types.InlineKeyboardButton(str(district), callback_data="district" + str(district)[:25]))
     markup.add(types.InlineKeyboardButton("Закрыть", callback_data=f"close"))
     return markup
 
@@ -312,8 +324,22 @@ def swipe_streets(callback_query: types.CallbackQuery):
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
+def send_address(CHAT_ID, uik):
+    user_info = get_user_info(CHAT_ID)
+    MESSAGE_ID = user_info["MESSAGE_ID"]
+    set_user_info(CHAT_ID, "UIK_NUM", str(int(uik['name'][uik['name'].rfind("№") + 1:])))
+    add_msg = f"🏠 Выбранный дом находится по адресу:\n{address_to_str(CHAT_ID)}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
+              f"{uik['address']}\n\n"
+    delete_message(CHAT_ID, MESSAGE_ID)
+    msg = bot.send_message(CHAT_ID, add_msg)
+    location_msg = bot.send_location(CHAT_ID, uik["lat"], uik["lon"])
+    set_user_info(CHAT_ID, "PREV_MSG_ID", str(msg.message_id))
+    set_user_info(CHAT_ID, "EXTRA_MSG_ID", str(location_msg.message_id))
+    print_candidates(CHAT_ID, uik["vrn"], CHAT_ID)
+
+
 @bot.callback_query_handler(lambda callback_query: callback_query.data.find("uik") == 0)
-def send_address(callback_query: types.CallbackQuery):
+def send_choosen_address(callback_query: types.CallbackQuery):
     CHAT_ID = callback_query.from_user.id
     try:
         id = callback_query.data[3:]
@@ -325,17 +351,12 @@ def send_address(callback_query: types.CallbackQuery):
         except telebot.apihelper.ApiTelegramException:
             pass
         set_probably_addresses = dict(get_user_info(CHAT_ID)["set_probably_addresses"])
+
         for add in set_probably_addresses.keys():
             if str(set_probably_addresses[add]['id']) == id:
                 address = add
                 uik = set_probably_addresses[add]["uik"]
-        set_user_info(CHAT_ID, "UIK_NUM", str(int(uik['name'][uik['name'].rfind("№") + 1:])))
-        add_msg = f"🏠 Выбранный дом находится по адресу:\n {address}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
-                  f"{uik['address']}"
-        msg = bot.send_message(callback_query.from_user.id, add_msg)
-        global PREV_MSG_ID
-        set_user_info(CHAT_ID, "PREV_MSG_ID", str(msg.message_id))
-        print_candidates(callback_query.from_user.id, uik["vrn"], CHAT_ID)
+        send_address(CHAT_ID, uik)
     except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
@@ -368,9 +389,15 @@ def close(callback_query: types.CallbackQuery):
     try:
         PREV_MSG_ID = get_user_info(CHAT_ID)["PREV_MSG_ID"]
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
+        try:
+            EXTRA_MESSEGE_ID = get_user_info(CHAT_ID)["EXTRA_MSG_ID"]
+            delete_message(CHAT_ID, EXTRA_MESSEGE_ID)
+        except BaseException:
+            pass
         delete_message(CHAT_ID, MESSAGE_ID)
         if not (PREV_MSG_ID is None):
             delete_message(CHAT_ID, PREV_MSG_ID)
+
         menu(CHAT_ID)
     except telebot.apihelper.ApiTelegramException:
         if CHAT_ID != 0:
@@ -406,6 +433,7 @@ def inline_street(callback_query: types.CallbackQuery):
     try:
         address = get_user_info(CHAT_ID)["address"]
         district = callback_query.data[8:]
+        print(district)
         for d in adds[address["county"]].keys():
             if d.find(district) == 0:
                 district = d
@@ -497,21 +525,15 @@ def get_house(message):
         load_msg = bot.send_message(message.from_user.id, "Загрузка... 🔁")
         address = user_info["address"]
         address["house"] = format_house(message.text)
-
         set_user_info(CHAT_ID, "address", address)
         diff_vrn, info = parser.get_address_info(address_to_url_str(CHAT_ID))
+        delete_message(CHAT_ID, load_msg.message_id)
         MESSAGE_ID = load_msg.message_id
         if len(diff_vrn) == 1:
             uik = {}
             for i in info.keys():
                 uik = info[i]["uik"]
-            set_user_info(CHAT_ID, "UIK_NUM", str(int(uik['name'][uik['name'].rfind("№") + 1:])))
-            add_msg = f"🏠 Выбранный дом находится по адресу:\n{address_to_str(CHAT_ID)}\n\n🏫 Ваша {uik['name']} находится по адресу:\n" \
-                      f"{uik['address']}\n\n"
-            delete_message(CHAT_ID, MESSAGE_ID)
-            msg = bot.send_message(message.from_user.id, add_msg)
-            set_user_info(CHAT_ID, "PREV_MSG_ID", str(msg.message_id))
-            print_candidates(message.from_user.id, uik["vrn"], CHAT_ID)
+            send_address(CHAT_ID, uik)
         elif len(diff_vrn) == 0:
             set_user_info(CHAT_ID, "MESSAGE_ID", MESSAGE_ID)
             dont_find(CHAT_ID, 1)
