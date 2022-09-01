@@ -4,7 +4,7 @@ import os
 import json
 from telebot import types
 from addresses import adds
-#from new_addresses_extra import adds
+#from diss import adds
 from keys import TELEGRAM_API_KEY
 
 bot = telebot.TeleBot(TELEGRAM_API_KEY)
@@ -50,6 +50,9 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
             street = street[street.find(" ") + 1:street.find(suffix) - 2] + " " + adj[words_street[0]] + " " + change[suffix]
         else:
             street = street[:street.find(suffix) - 2] + " " + change[suffix]
+
+        if street.find("-") != -1:
+            street = street[:street.find("-")] + street[street.find("-") + 1:]
         return street
 
     try:
@@ -60,13 +63,17 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
             street = address['street']
             house = address["house"]
         if county == "Зеленоградский административный округ":
-            district+=" Зеленоград г"
+            district += " Зеленоград г"
+        if district.find("-") != -1:
+            district = district[:district.find("-")] + " " + district[district.find("-") + 1:]
         add = f"Город Москва {county} {district.replace('ё', 'е')} "
         if street.find("микрорайон") != -1:
-            return add + "д " + house
+            return add + "д " + str(house)
         for suffix in change.keys():
             if street.find(suffix) != -1:
                 street = format_street(street, suffix)
+        if street.upper().find("РАЙОН") != -1:
+            street = "д"
         if house is None:
             return add + street.replace('ё', 'е').upper()
         return add + street.replace('ё', 'е').upper() + " " + house

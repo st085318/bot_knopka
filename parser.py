@@ -41,7 +41,7 @@ def is_vrn_in_vrns(vrn, vrns):
     return 0
 
 
-def get_address_info(address: str, quantity_return = 2):
+def get_address_info(address: str, quantity_return=2):
     format_address = f"%20".join(address.split(" "))
     url = f"http://www.cikrf.ru/iservices/voter-services/address/search/{format_address}"
     addresses_info = json.loads(requests.get(url, headers=headers).text)

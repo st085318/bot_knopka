@@ -1,5 +1,6 @@
 import json
 import time
+import re
 
 import requests
 import parser
@@ -38,16 +39,18 @@ def get_list_areas():
         counties_list.append(area.split("</strong>"))
     counties_list = counties_list[1:]
     for c in counties_list:
-
         county = get_name(c[0])
-        if county != "ЗелАО":
-            continue
+        #if county != "ЗелАО":
+        #    continue
         print(county)
         districts_html = c[1].split(",<br/>")
         districts = {}
         for d in districts_html:
             streets = []
             streets_list = get_list_streets(get_attr("href", d))
+            if format_district(county, get_name(d)) == "Восточный район":
+                print(get_attr("href", d))
+                print(streets_list)
             for s in streets_list:
                 if s.rfind("(") != -1:
                     s = s[:s.rfind("(")]
@@ -56,17 +59,18 @@ def get_list_areas():
                     pref = s[:s.rfind(" ")]
                     s = pref + "," + suff
                 q = is_street_exist(format_county(county), format_district(county, get_name(d)), s)
-                time.sleep(0.5)
+                time.sleep(1)
                 if q:
                     streets.append(s)
             districts[format_district(county, get_name(d))] = streets
+            #districts[format_district(county, get_name(d))] = streets_list
             time.sleep(1)
-            print(districts)
+            #print(districts)
             #print(get_name(d) + " title " + get_attr("title", d))
         counties[county] = districts
-        with open("zel.py", "w") as f:
+        with open("clean.py", "w") as f:
             f.write(str(counties))
-    print(counties)
+    #print(counties)
 
     return counties_list
 
@@ -109,11 +113,10 @@ def get_attr(attr, html_str):
 def get_list_streets(url):
     area_page = requests.get(url, headers=headers)
     soup = BeautifulSoup(area_page.text, "html.parser")
-    streets_info = str(soup.findAll("div", {"class": "double_block clearfix"}))
-    streets_with_other = streets_info.split("<li>")
+    streets_info = soup.findAll("a", {"href": re.compile("http://mosopen.ru/street/.*")})
     streets = []
-    for s in streets_with_other:
-        streets.append(s[s.find(">") + 1:s.rfind("</a>")])
+    for s in streets_info:
+        streets.append(str(s)[str(s).find(">") + 1:str(s).rfind("</a>")])
     return streets[1:]
 
 
@@ -123,5 +126,5 @@ def is_street_exist(county, district, street):
     return 0
 
 if __name__ == "__main__":
-    #print(is_street_exist("Восточный административный округ", "Район Вешняки", "Косинская, ул."))
+    #print(is_street_exist("Восточный административный округ", "Восточный район", "9 мая, ул."))
     get_list_areas()
