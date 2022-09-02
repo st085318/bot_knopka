@@ -448,7 +448,6 @@ def inline_street(callback_query: types.CallbackQuery):
     try:
         address = get_user_info(CHAT_ID)["address"]
         district = callback_query.data[8:]
-        print(district)
         for d in adds[address["county"]].keys():
             if d.find(district) == 0:
                 district = d
@@ -628,7 +627,6 @@ def print_candidates(message_id, vrn, CHAT_ID):
                 break
         cand_msg = ""
         q = 0
-        print(list_candidates)
         for c in list_candidates:
             if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 or special_people(c)) and str(c['numokr']) == str(numokr):
                 try:
