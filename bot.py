@@ -43,17 +43,27 @@ def set_user_info(chat_id, var, val):
 # TODO: удалять ё
 def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, house=None):
     def format_street(street, suffix):
+        street = street.replace(",", "")
         words_street = street.split(" ")
-        if ((words_street[0] == "Старый" or words_street[0] == "Старая") and street != "Старый гай") or street == "Новый Зыковский проезд" or words_street[0] == "Новая":
-            street = street[street.find(" ") + 1:street.find(suffix) - 2] + " " + adj[words_street[0]] + change[suffix]
-        elif words_street[0] in ["Большой", "Малый", "Средний", "Большая", "Малая", "Средняя"]:
-            street = street[street.find(" ") + 1:street.find(suffix) - 2] + " " + adj[words_street[0]] + " " + change[suffix]
-        else:
-            street = street[:street.find(suffix) - 2] + " " + change[suffix]
+        f_street = ""
+        words_street.remove(suffix)
 
-        if street.find("-") != -1:
-            street = street[:street.find("-")] + street[street.find("-") + 1:]
-        return street
+        if ((words_street[0] == "Старый" or words_street[0] == "Старая") and street != "Старый гай") or street == "Новый Зыковский проезд" or words_street[0] == "Новая":
+            for w in words_street[1:]:
+                f_street += w + " "
+            f_street += adj[words_street[0]] + change[suffix]
+        elif words_street[0] in ["Большой", "Малый", "Средний", "Большая", "Малая", "Средняя"]:
+            for w in words_street[1:]:
+                f_street += w + " "
+            f_street = + adj[words_street[0]] + change[suffix]
+        else:
+            for w in words_street:
+                f_street += w + " "
+            f_street += change[suffix]
+
+        if f_street.find("-") != -1:
+            f_street = f_street[:f_street.find("-")] + f_street[f_street.find("-") + 1:]
+        return f_street
 
     try:
         if county is None:
@@ -64,17 +74,18 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
             house = address["house"]
         if county == "Зеленоградский административный округ":
             district += " Зеленоград г"
+        '''
         if district.find("-") != -1:
             b = district[:district.find("-")]
             e = district[district.find("-") + 1:]
-            print(b)
             district = b
             if district.upper().find("ОРЕХОВО") == -1:
                 district += " "
             district += e
-            print(district)
-            print("---------------------------------------")
+        
         add = f"Город Москва {county} {district.replace('ё', 'е')} "
+        '''
+        add = "Город Москва "
         if street.find("микрорайон") != -1:
             return add + "д " + str(house)
         for suffix in change.keys():
@@ -82,7 +93,6 @@ def address_to_url_str(CHAT_ID = None, county=None, district=None, street=None, 
                 street = format_street(street, suffix)
         if street.upper().find("РАЙОН") != -1:
             street = "д"
-        print(street)
         if street.upper().find("СЕВЕРНАЯ") != -1:
             part_street = street.split(" ")
             street = part_street[1][:-1] + " " + part_street[0] + " " + part_street[2]
@@ -129,8 +139,10 @@ def make_markup_swipe_candidates(page):
 def make_markup():
     markup = types.InlineKeyboardMarkup()
     button_cik = types.InlineKeyboardButton("Найти мой УИК", callback_data="find_cik")
+    button_street = types.InlineKeyboardButton("Ввести адрес самостоятельно", callback_data="write_street")
     # button_candidates = types.InlineKeyboardButton("Посмотреть кандидатов", callback_data="candidates")
     markup.add(button_cik)
+    markup.add(button_street)
     # markup.add(button_candidates)
     return markup
 
@@ -258,6 +270,9 @@ def write_street(message):
         CHAT_ID = message.from_user.id
         address = get_user_info(CHAT_ID)["address"]
         address["street"] = message.text
+        address["county"] = ""
+        address["district"] = ""
+        delete_message(CHAT_ID, message.id)
         set_user_info(CHAT_ID, "address", address)
         msg = bot.send_message(CHAT_ID, "Введите номер дома")
         MESSAGE_ID = get_user_info(CHAT_ID)["MESSAGE_ID"]
@@ -547,7 +562,7 @@ def get_house(message):
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
 
 
-def get_candidates_info(c, cand_msg, q, CHAT_ID):
+def get_candidates_info(c, cand_mssg, q, CHAT_ID):
     try:
         time_point = str(c["datroj"]).rfind(" ")
         namio_point = c["namio"].find("партии")
@@ -560,7 +575,7 @@ def get_candidates_info(c, cand_msg, q, CHAT_ID):
         if namio == "Самовыдвижение":
             namio = "⬜" + namio
         elif namio == "\"НОВЫЕ ЛЮДИ\"":
-            namio = "🗳" + namio
+            namio = "☑" + namio
         elif namio == "\"КОММУНИСТИЧЕСКАЯ ПАРТИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ\"":
             namio = "🟥" + namio
         elif namio == "\"ЕДИНАЯ РОССИЯ\"":
@@ -573,13 +588,20 @@ def get_candidates_info(c, cand_msg, q, CHAT_ID):
         elif namio.upper().find("ЯБЛОКО") != -1:
             namio = "🟩" + namio
 
-        cand_msg += "👤" + fio + " (" + str(c["datroj"])[:time_point] + ")\n" + str(namio + "\n\n")
-        q += 1
+        cand_msg = "👤" + fio + " (" + str(c["datroj"])[:time_point] + ")\n" + str(namio + "\n\n")
+
+
+        my_candidats = list(get_user_info(CHAT_ID)["my_candidats"])
         if q % 7 == 0:
-            my_candidats = list(get_user_info(CHAT_ID)["my_candidats"])
             my_candidats.append(cand_msg)
-            set_user_info(CHAT_ID, "my_candidats", my_candidats)
-            cand_msg = ""
+        else:
+            if len(my_candidats) == 0:
+                my_candidats[0] += cand_msg
+            else:
+                my_candidats[-1] += cand_msg
+
+        q += 1
+        set_user_info(CHAT_ID, "my_candidats", my_candidats)
         return q, cand_msg
     except BaseException as e:
         if CHAT_ID != 0:
@@ -606,6 +628,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
                 break
         cand_msg = ""
         q = 0
+        print(list_candidates)
         for c in list_candidates:
             if (str(c['namio']).find("НОВЫЕ ЛЮДИ") != -1 or special_people(c)) and str(c['numokr']) == str(numokr):
                 try:
@@ -613,6 +636,7 @@ def print_candidates(message_id, vrn, CHAT_ID):
                         q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
                 except KeyError:
                     pass
+        '''
         for c in list_candidates:
             if str(c['namio']).find("Самовыдвижение") != -1 and str(c['numokr']) == str(numokr):
                 try:
@@ -627,13 +651,15 @@ def print_candidates(message_id, vrn, CHAT_ID):
                         q, cand_msg = get_candidates_info(c, cand_msg, q, CHAT_ID)
                 except KeyError:
                     pass
+        '''
         my_candidats = get_user_info(CHAT_ID)["my_candidats"]
         delete_message(CHAT_ID, load_msg.message_id)
         msg = bot.send_message(message_id, f"Список кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
                                reply_markup=make_markup_swipe_candidates(0))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
     except IndexError:
-        bot.send_message(CHAT_ID, "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).")
+        bot.send_message(CHAT_ID,
+                         "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).")
     except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
