@@ -147,6 +147,12 @@ def make_markup():
     return markup
 
 
+def make_close_markup():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Закрыть", callback_data=f"close"))
+    return markup
+
+
 def make_county_markup():
     markup = types.InlineKeyboardMarkup()
     for c in adds.keys():
@@ -611,13 +617,21 @@ def get_candidates_info(c, cand_mssg, q, CHAT_ID):
 def print_candidates(message_id, vrn, CHAT_ID):
     def special_people(candidate):
         time_point = str(candidate["datroj"]).rfind(" ")
+        UIK_NUM = get_user_info(CHAT_ID)["UIK_NUM"]
         if str(candidate["fio"]) == "Ляховецкий Никита Владимирович" and str(candidate["datroj"])[:time_point] == "07.08.1998":
+            return 1
+        elif (str(candidate["fio"]) == "Волгина Мария Владимировна" or str(candidate["fio"]) == "Твардовская Евгения Борисовна") and \
+            str(UIK_NUM) in [str(398), str(399), str(400), str(401), str(402)]:
+            return 1
+        elif (str(candidate["fio"]) == "Воробьева Вера Васильевна" or str(candidate["fio"]) == "Кириллов Кирилл Сергеевич" or \
+            str(candidate["fio"]) == "Якубович Яков Борисович") and (str(UIK_NUM) in [str(137), str(138), str(153), str(155)]):
             return 1
         return 0
     try:
         user_info = get_user_info(CHAT_ID)
         load_msg = bot.send_message(message_id, "Загрузка... 🔁")
         set_user_info(CHAT_ID, "my_candidats",  [])
+        list_candidates = []
         list_candidates, mandates = parser.get_list_of_candidates(vrn)
         UIK_NUM = user_info["UIK_NUM"]
         numokr = None
@@ -652,12 +666,16 @@ def print_candidates(message_id, vrn, CHAT_ID):
         '''
         my_candidats = get_user_info(CHAT_ID)["my_candidats"]
         delete_message(CHAT_ID, load_msg.message_id)
-        msg = bot.send_message(message_id, f"Список кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
+        msg = bot.send_message(message_id, f"Список ваших кандидатов по {numokr} избирательному округу:\n" + my_candidats[0],
                                reply_markup=make_markup_swipe_candidates(0))
         set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
     except IndexError:
-        bot.send_message(CHAT_ID,
-                         "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).")
+        if len(list_candidates) > 0:
+            msg = bot.send_message(CHAT_ID,"👨‍💻 Похоже, что по вашему адресу нет наших кандидатов", reply_markup=make_close_markup())
+        else:
+            msg = bot.send_message(CHAT_ID,
+                         "👨‍💻 Похоже, что по вашему адресу не проводится голосование в этом году. Напомню, выборы проходят везде, кроме Щукино и Новой Москвы (исключение – Троицк).", reply_markup=make_close_markup())
+        set_user_info(CHAT_ID, "MESSAGE_ID", str(msg.message_id))
     except BaseException as e:
         if CHAT_ID != 0:
             bot.send_message(CHAT_ID, "Что-то пошло не так...\nПерезапустите бота")
